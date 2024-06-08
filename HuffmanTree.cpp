@@ -17,7 +17,7 @@
 #define WHITE   "\033[37m"      /* White */
 #define MAXleafnum 128
 #define MAXhufnum 2*MAXleafnum
-#define N 256
+#define N 512
 
 typedef char ElemType;
 
@@ -221,9 +221,7 @@ static void decode(HTNode ht[], ElemType code[], ElemType res[], int n0, int &fl
 			i++;//若当前i被用了,才移动
 			if (code[i] == '\0') {//最后一个01字符要单独解决，这个循环条件的限制
 				res[j++] = ht[f].data;//找到叶子节点
-				if (res[0] != '`') {
-					flag = 1;//只解码一个字符的校对补丁
-				}
+				flag = 1;//只解码一个字符的校对补丁
 			}
 		}
 		else {
@@ -231,6 +229,9 @@ static void decode(HTNode ht[], ElemType code[], ElemType res[], int n0, int &fl
 			f = 2 * n0 - 2;//parent节点回到最上层
 			flag = 1;
 		}
+	}
+	if (strchr(res, '`') != NULL) {
+		flag = 0;
 	}
 	res[j] = '\0';
 }
