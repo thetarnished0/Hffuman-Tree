@@ -4,6 +4,17 @@
 #include <fstream>  // 用于文件操作
 #include <string>   // 用于处理字符串
 #include <sstream>  // 用于字符串流
+
+// ANSI转义序列用于颜色
+#define RESET   "\033[0m"
+#define BLACK   "\033[30m"      /* Black */
+#define RED     "\033[31m"      /* Red */
+#define GREEN   "\033[32m"      /* Green */
+#define YELLOW  "\033[33m"      /* Yellow */
+#define BLUE    "\033[34m"      /* Blue */
+#define MAGENTA "\033[35m"      /* Magenta */
+#define CYAN    "\033[36m"      /* Cyan */
+#define WHITE   "\033[37m"      /* White */
 #define MAXleafnum 128
 #define MAXhufnum 2*MAXleafnum
 #define N 256
@@ -53,17 +64,21 @@ static void CreateHT(HTNode ht[], int n0) {//不需要传递数组大小
 }
 
 static void initialize(HTNode ht[], int &leafnum) {
-	printf("请输入字符集大小: ");
+	std::cout << YELLOW << "请输入字符集大小: " << RESET;
 	scanf_s("%d", &leafnum);
 	getchar();  // 清除换行符
 
+	std::cout << YELLOW << "Notice:  为了读入方便，请用特殊符号'*'替代空格字符的输入\n" << RESET;
 	for (int i = 0; i < leafnum; ++i) {//接受用户输入
-		printf("请输入第 %d 个字符和权值: ", i + 1);
+		printf("请输入第 %d 个字符和权值:（通过空格分隔）", i + 1);
 		char data;
 		double weight;
 		scanf_s("%c %lf", &data, 1, &weight);
 		getchar();  // 清除换行符
 		ht[i].data = data; ht[i].weight = weight;
+	}
+	for (int j = leafnum; j < 2 * leafnum - 1; j++) {//无效字符的填充
+		ht[j].data = '`';
 	}
 
 	//建立哈夫曼树
@@ -71,7 +86,7 @@ static void initialize(HTNode ht[], int &leafnum) {
 
 	// 将哈夫曼树写入文件
 	std::ofstream myfile;
-	myfile.open("F:/visual_work/final_work/hfmTree.txt");
+	myfile.open("hfmTree.txt");
 	for (int i = 0; i < 2 * leafnum - 1; ++i) {
 		myfile << ht[i].index << " " << ht[i].data << " " << ht[i].weight << " " << ht[i].parent << " " << ht[i].lchild << " " << ht[i].rchild << "\n";
 	}
@@ -115,7 +130,7 @@ static int encode(HTNode ht[], HCode hcd[], ElemType s[], int n0, int &flag) {
 			}
 		}
 		if (j == n0) {
-			printf("当前hfmTree无法对你传入的字符进行编码，请核对后再输入，或者进行hfmTree初始化\n");
+			std::cout << RED << "Warning:当前hfmTree无法对你传入的字符进行编码，请查看当前HFMTree中的字符集(P),核对后再输入，或者进行hfmTree初始化\n" << RESET;
 			flag = 0;
 			break;
 		}
@@ -164,7 +179,7 @@ static int encode(HTNode ht[], HCode hcd[], ElemType s[], int n0, int &flag) {
 static void InteractiveEncode(HTNode ht[], HCode hcd[], int leafnum) {
 	// 交互式编码
 	int flag = 1;//用于确定当前是否编码成功
-	printf("请输入您想要编码的字符串或者字符，字符串中可以包含空格：");
+	std::cout << YELLOW << "请输入您想要编码的字符串或者字符，字符串中可以包含空格：" << RESET;
 	ElemType s1[N] = { '\0' };
 	int count = 0; // 记录有多少个字符被编码
 	fgets(s1, sizeof(s1), stdin); // 使用fgets代替scanf_s
@@ -174,9 +189,9 @@ static void InteractiveEncode(HTNode ht[], HCode hcd[], int leafnum) {
 	}
 	count = encode(ht, hcd, s1, leafnum, flag);
 	if (flag == 1) {//编码成功才进行写入和打印
-		printf("编码结果：");
+		std::cout << GREEN << "编码结果：" << RESET;
 		std::ofstream myfile;
-		myfile.open("F:/visual_work/final_work/CodeFile.txt"); // 写入
+		myfile.open("CodeFile.txt"); // 写入
 		for (int k = 0; k < count; k++) {
 			int j = hcd[k].start;
 			while (hcd[k].cd[j] != '\0') {
@@ -194,6 +209,7 @@ static void decode(HTNode ht[], ElemType code[], ElemType res[], int n0, int &fl
 	int i, f, j = 0; //j用于编码字符下标的移动
 	f = 2 * n0 - 2;//最上面的那个顶点的物理下标
 	i = 0;
+
 	while (code[i] != '\0') {//遍历code字符串
 		if (ht[f].lchild != -1 && ht[f].rchild != -1) {//当前parent节点的左右孩子均不为空
 			if (code[i] == '0') {//左
@@ -205,7 +221,9 @@ static void decode(HTNode ht[], ElemType code[], ElemType res[], int n0, int &fl
 			i++;//若当前i被用了,才移动
 			if (code[i] == '\0') {//最后一个01字符要单独解决，这个循环条件的限制
 				res[j++] = ht[f].data;//找到叶子节点
-				flag = 1;//只解码一个字符的校对补丁
+				if (res[0] != '`') {
+					flag = 1;//只解码一个字符的校对补丁
+				}
 			}
 		}
 		else {
@@ -221,7 +239,8 @@ static void decode(HTNode ht[], ElemType code[], ElemType res[], int n0, int &fl
 static void InteractiveDecode(HTNode ht[], int leafnum) {
 	//交互式解码
 	int flag = 0;//用于核对解码是否成功
-	printf("\n请输入你要解码的编码串：");
+	std::cout << RED << "Notice:请确保您输入的编码串没有换行符\n" << RESET;
+	std::cout << YELLOW << "请输入你要解码的编码串：" << RESET;
 	ElemType res[N] = { '\0' };//结果
 	ElemType code[N] = { '\0' };//用户输入
 	scanf_s("%s", code, (unsigned)_countof(code));
@@ -230,8 +249,8 @@ static void InteractiveDecode(HTNode ht[], int leafnum) {
 	if (flag == 1) {
 		int n = 0;
 		std::ofstream myfile1;
-		myfile1.open("F:/visual_work/final_work/TextFile.txt");//写入
-		printf("解码结果：\n");
+		myfile1.open("TextFile.txt");//写入
+		std::cout << GREEN << "解码结果：\n" << RESET;
 		while (res[n] != '\0') {
 			if (res[n] == '*') {
 				printf(" ");//读取文件的补丁
@@ -246,15 +265,15 @@ static void InteractiveDecode(HTNode ht[], int leafnum) {
 		myfile1.close();
 	}
 	else {
-		printf("你输入的编码串有错误，请核对后再输入！");
+		std::cout << RED << "你输入的编码串有错误，请核对后再输入!" << RESET;
 	}
 	printf("\n");
 }
 
 static void PrintCode() {
-	printf("以整洁的方式显示编码结果(此结果是最近一次编码成功，并且存储在文件中的结果)：\n");
-	std::ifstream inFile("F:/visual_work/final_work/CodeFile.txt");//从文件里(in)读取
-	std::ofstream outFile("F:/visual_work/final_work/CodePrin.txt");//写入
+	std::cout << GREEN << "以整洁的方式显示编码结果(此结果是最近一次编码成功，并且存储在文件中的结果)：\n" << RESET;
+	std::ifstream inFile("CodeFile.txt");//从文件里(in)读取
+	std::ofstream outFile("CodePrin.txt");//写入
 
 	if (!inFile || !outFile) {
 		std::cerr << "Unable to open file";
@@ -325,7 +344,7 @@ static bool deQueue(SqQueue*& q, PrintNode& e) {
 
 
 static void printTree(HTNode ht[], int root, int n0, int leafnum) {
-	std::ofstream outFile("F:/visual_work/final_work/TreePrint.txt");
+	std::ofstream outFile("TreePrint.txt");
 	if (!outFile) {
 		std::cerr << "Unable to open file";
 		exit(1);
@@ -377,12 +396,12 @@ static void printTree(HTNode ht[], int root, int n0, int leafnum) {
 			enQueue(q, e0);
 		}
 	}
-
 	outFile.close();
+	printf("\n");
 }
 
 static void readTree(HTNode ht[], int &leafnum) {
-	std::ifstream myfile("F:/visual_work/final_work/hfmTree.txt");//读取
+	std::ifstream myfile("hfmTree.txt");//读取进内存
 	int i = 0;//某个ht节点
 	if (myfile.is_open()) {
 		std::string line;
@@ -401,7 +420,6 @@ static void readTree(HTNode ht[], int &leafnum) {
 			ht[i].lchild = lchild;
 			ht[i].rchild = rchild;
 			i++;
-			std::cout << "Index:" << index << ", Data: " << data << ", Weight: " << weight << ", Parent: " << parent << ", LChild: " << lchild << ", RChild: " << rchild << std::endl;
 		}
 		leafnum = (i + 1) / 2;//统计叶子节点个数
 		myfile.close();
@@ -409,4 +427,30 @@ static void readTree(HTNode ht[], int &leafnum) {
 	else {
 		std::cout << "Unable to open file";
 	}
+}
+
+static void dispHFMtree(int& leafnum) {
+	std::cout << GREEN << "当前的hfmTree:\n" << RESET;
+	std::ifstream myfile("hfmTree.txt");//读取
+	if (myfile.is_open()) {
+		std::string line;
+		while (getline(myfile, line)) {
+			std::istringstream iss(line);
+			ElemType data;
+			double weight;
+			int index, parent, lchild, rchild;
+			if (!(iss >> index >> data >> weight >> parent >> lchild >> rchild)) { break; } // error
+
+			// process data
+			std::cout << "Index:" << index << ", Data: " << data << ", Weight: " << weight << ", Parent: " << parent << ", LChild: " << lchild << ", RChild: " << rchild << std::endl;
+		}
+		myfile.close();
+	}
+	else {
+		std::cout << "Unable to open file";
+	}
+}
+
+static void quit() {
+	std::cout << GREEN << "Thank you for using my system!\nBye~~~\n" << RESET;
 }
