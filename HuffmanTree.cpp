@@ -1,0 +1,412 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <iostream> // 用于输入/输出
+#include <fstream>  // 用于文件操作
+#include <string>   // 用于处理字符串
+#include <sstream>  // 用于字符串流
+#define MAXleafnum 128
+#define MAXhufnum 2*MAXleafnum
+#define N 256
+
+typedef char ElemType;
+
+typedef struct {//Huffman树结构
+	int index;//便于后面的解密查找
+	ElemType data;
+	double weight;
+	int parent;
+	int lchild;
+	int rchild;
+}HTNode;
+
+typedef struct {//编码用的结构体
+	ElemType cd[N];
+		int start;
+}HCode;
+
+
+static void CreateHT(HTNode ht[], int n0) {//不需要传递数组大小
+	int i, k, lnode, rnode;
+	double min1, min2;
+	for (i = 0; i < 2 * n0 - 1; i++) {//所有相关联域设置初值为-1
+		ht[i].index = i;
+		ht[i].parent = ht[i].lchild = ht[i].rchild = -1;
+	}
+	for (i = n0; i <= 2 * n0 - 2; i++) {//构造HT的n0-1个分支节点
+		min1 = min2 = 33333;//初始值设大用于比较用,临时左右weight
+		lnode = rnode = -1;//临时左右节点
+		for (k = 0; k <= i - 1; k++) {//每次遍历要创建的i节点的前面所有节点
+			if (ht[k].parent == -1) {//如果当前节点没有父亲节点，那么就可以将其纳入考虑
+				if (ht[k].weight < min1) {//这个地方可以看出，是设置为min1<min2，即左权小于右权
+					min2 = min1; rnode = lnode;
+					min1 = ht[k].weight; lnode = k;
+				}
+				else if (ht[k].weight < min2) {
+					min2 = ht[k].weight; rnode = k;
+				}
+			}
+		}
+		ht[i].weight = ht[lnode].weight + ht[rnode].weight;
+		ht[i].lchild = lnode; ht[i].rchild = rnode;  //ht[i]是parent节点
+		ht[lnode].parent = i; ht[rnode].parent = i;//已用掉的节点设置parent节点
+	}
+}
+
+static void initialize(HTNode ht[], int &leafnum) {
+	printf("请输入字符集大小: ");
+	scanf_s("%d", &leafnum);
+	getchar();  // 清除换行符
+
+	for (int i = 0; i < leafnum; ++i) {//接受用户输入
+		printf("请输入第 %d 个字符和权值: ", i + 1);
+		char data;
+		double weight;
+		scanf_s("%c %lf", &data, 1, &weight);
+		getchar();  // 清除换行符
+		ht[i].data = data; ht[i].weight = weight;
+	}
+
+	//建立哈夫曼树
+	CreateHT(ht, leafnum);
+
+	// 将哈夫曼树写入文件
+	std::ofstream myfile;
+	myfile.open("F:/visual_work/final_work/hfmTree.txt");
+	for (int i = 0; i < 2 * leafnum - 1; ++i) {
+		myfile << ht[i].index << " " << ht[i].data << " " << ht[i].weight << " " << ht[i].parent << " " << ht[i].lchild << " " << ht[i].rchild << "\n";
+	}
+	myfile.close();
+}
+
+static void CreateHCode(HTNode ht[], HCode hcd[], int n0) {
+	int i, f, c;//父母，孩子的下标
+	HCode hc;//相当于临时结构了
+	for (i = 0; i < n0; i++) {//实际要进行编码的是前n0个叶子节点
+		hc.start = n0; c = i;
+		f = ht[i].parent;
+		while (f != -1) {
+			if (ht[f].lchild == c) {//如果是左孩子
+				hc.cd[hc.start--] = '0';
+			}
+			else {
+				hc.cd[hc.start--] = '1';//如果是右孩子
+			}
+			c = f; f = ht[f].parent;//孩子节点和parent节点改变继续向上寻找
+		}
+		hc.start++;//这里start++是因为前面的start--了，必须进一位起始下标才能正确
+		hc.cd[n0 + 1] = '\0';
+		hcd[i] = hc;
+	}
+}
+
+static int encode(HTNode ht[], HCode hcd[], ElemType s[], int n0, int &flag) {
+	int i, f, c;//父母，孩子的下标
+	HCode hc;//相当于临时结构了
+	i = 0;
+	int index = 0;//对应字符在htmTree中的index
+	int j;
+	while (s[i] != '\0') {//遍历传入的字符串
+		for (j = 0; j < n0; j++) {//遍历查看内存中的hfmtree是否可以对用户输入的字符编码
+			if (s[i] == ' ') {//如果输入是空格，单独处理一下，这里是文件读取的补丁
+				index = 0; break;
+			}
+			if (ht[j].data == s[i]) {
+				index = j; break;
+			}
+		}
+		if (j == n0) {
+			printf("当前hfmTree无法对你传入的字符进行编码，请核对后再输入，或者进行hfmTree初始化\n");
+			flag = 0;
+			break;
+		}
+		//正常情况下的编码
+		hc.start = n0; c = index;
+		f = ht[index].parent;
+		while (f != -1) {
+			if (ht[f].lchild == c) {//如果是左孩子
+				hc.cd[hc.start--] = '0';
+			}
+			else {
+				hc.cd[hc.start--] = '1';//如果是右孩子
+			}
+			c = f; f = ht[f].parent;//孩子节点和parent节点改变继续向上寻找
+		}
+		hc.start++;//这里start++是因为前面的start--了，必须进一位起始下标才能正确
+		hc.cd[n0 + 1] = '\0';
+		hcd[i] = hc;
+		i++;//下标移动
+	}
+	return i;//count一下有多少个字符被编码了
+}
+
+/*static void InteractiveEncode(HTNode ht[], HCode hcd[], int leafnum) {
+	//交互式编码
+	printf("请输入你要编码的字符或者字符串：");
+	ElemType s1[N] = { '\0' };
+	int count = 0;//记录有多少个字符被编码了
+	scanf_s("%s", s1, (unsigned)_countof(s1));
+	getchar();//清除换行符
+	count = encode(ht, hcd, s1, leafnum);
+	printf("编码结果：");
+	std::ofstream myfile;
+	myfile.open("F:/visual_work/final_work/CodeFile.txt");//写入
+	for (int k = 0; k < count; k++) {
+		int j = hcd[k].start;
+		while (hcd[k].cd[j] != '\0') {
+			printf("%c", hcd[k].cd[j]);
+			myfile << hcd[k].cd[j];
+			j++;
+		}
+	}
+	myfile.close();
+}*/
+
+static void InteractiveEncode(HTNode ht[], HCode hcd[], int leafnum) {
+	// 交互式编码
+	int flag = 1;//用于确定当前是否编码成功
+	printf("请输入您想要编码的字符串或者字符，字符串中可以包含空格：");
+	ElemType s1[N] = { '\0' };
+	int count = 0; // 记录有多少个字符被编码
+	fgets(s1, sizeof(s1), stdin); // 使用fgets代替scanf_s
+	// 移除可能读入的换行符
+	if (s1[strlen(s1) - 1] == '\n') {
+		s1[strlen(s1) - 1] = '\0';
+	}
+	count = encode(ht, hcd, s1, leafnum, flag);
+	if (flag == 1) {//编码成功才进行写入和打印
+		printf("编码结果：");
+		std::ofstream myfile;
+		myfile.open("F:/visual_work/final_work/CodeFile.txt"); // 写入
+		for (int k = 0; k < count; k++) {
+			int j = hcd[k].start;
+			while (hcd[k].cd[j] != '\0') {
+				printf("%c", hcd[k].cd[j]);
+				myfile << hcd[k].cd[j];
+				j++;
+			}
+		}
+		myfile.close();
+	}
+	printf("\n");
+}
+
+static void decode(HTNode ht[], ElemType code[], ElemType res[], int n0, int &flag) {
+	int i, f, j = 0; //j用于编码字符下标的移动
+	f = 2 * n0 - 2;//最上面的那个顶点的物理下标
+	i = 0;
+	while (code[i] != '\0') {//遍历code字符串
+		if (ht[f].lchild != -1 && ht[f].rchild != -1) {//当前parent节点的左右孩子均不为空
+			if (code[i] == '0') {//左
+				f = ht[f].lchild;
+			}
+			else if (code[i] == '1') {//右
+				f = ht[f].rchild;
+			}
+			i++;//若当前i被用了,才移动
+			if (code[i] == '\0') {//最后一个01字符要单独解决，这个循环条件的限制
+				res[j++] = ht[f].data;//找到叶子节点
+				flag = 1;//只解码一个字符的校对补丁
+			}
+		}
+		else {
+			res[j++] = ht[f].data;//找到叶子节点
+			f = 2 * n0 - 2;//parent节点回到最上层
+			flag = 1;
+		}
+	}
+	res[j] = '\0';
+}
+
+
+static void InteractiveDecode(HTNode ht[], int leafnum) {
+	//交互式解码
+	int flag = 0;//用于核对解码是否成功
+	printf("\n请输入你要解码的编码串：");
+	ElemType res[N] = { '\0' };//结果
+	ElemType code[N] = { '\0' };//用户输入
+	scanf_s("%s", code, (unsigned)_countof(code));
+	getchar();//清除换行符
+	decode(ht, code, res, leafnum, flag);
+	if (flag == 1) {
+		int n = 0;
+		std::ofstream myfile1;
+		myfile1.open("F:/visual_work/final_work/TextFile.txt");//写入
+		printf("解码结果：\n");
+		while (res[n] != '\0') {
+			if (res[n] == '*') {
+				printf(" ");//读取文件的补丁
+				myfile1 << " ";
+				n++;
+				continue;
+			}
+			printf("%c", res[n]);
+			myfile1 << res[n];
+			n++;
+		}
+		myfile1.close();
+	}
+	else {
+		printf("你输入的编码串有错误，请核对后再输入！");
+	}
+	printf("\n");
+}
+
+static void PrintCode() {
+	printf("以整洁的方式显示编码结果(此结果是最近一次编码成功，并且存储在文件中的结果)：\n");
+	std::ifstream inFile("F:/visual_work/final_work/CodeFile.txt");//从文件里(in)读取
+	std::ofstream outFile("F:/visual_work/final_work/CodePrin.txt");//写入
+
+	if (!inFile || !outFile) {
+		std::cerr << "Unable to open file";
+		exit(1);
+	}
+
+	char buffer[51] = { 0 }; // 50 characters and the null terminator
+	while (inFile.read(buffer, 50)) {
+		std::cout << buffer << std::endl;
+		outFile << buffer << std::endl;
+		memset(buffer, 0, sizeof(buffer)); // clear the buffer
+	}
+
+	//最后一行若没有50个字符，额外处理
+	std::cout << buffer << std::endl;
+	outFile << buffer << std::endl;
+
+	inFile.close();
+	outFile.close();
+	printf("\n");
+}
+
+
+typedef struct {
+	int node;//节点编号
+	int	depth;//节点深度
+	int len;//节点的左边空格数目
+}PrintNode;
+/*队列*/
+#define MaxSize 128
+
+typedef struct {
+	PrintNode data[MaxSize];
+	int front, rear;
+}SqQueue;
+
+static void InitQueue(SqQueue*& q) {
+	q = (SqQueue*)malloc(sizeof(SqQueue));
+	q->front = q->rear = -1;
+}
+
+static void DestoryQueue(SqQueue*& q) {
+	free(q);
+}
+
+static bool QueueEmpty(SqQueue* q) {
+	return (q->front == q->rear);
+}
+
+static bool enQueue(SqQueue*& q, PrintNode e) {
+	if (q->rear == MaxSize - 1) {
+		return false;
+	}
+	q->rear++;
+	q->data[q->rear] = e;
+	return true;
+}
+
+static bool deQueue(SqQueue*& q, PrintNode& e) {
+	if (q->front == q->rear) {
+		return false;
+	}
+	q->front++;
+	e = q->data[q->front];//front应看作虚节点，不能访问
+	return true;
+}
+/*队列*/
+
+
+static void printTree(HTNode ht[], int root, int n0, int leafnum) {
+	std::ofstream outFile("F:/visual_work/final_work/TreePrint.txt");
+	if (!outFile) {
+		std::cerr << "Unable to open file";
+		exit(1);
+	}
+
+	SqQueue* q; InitQueue(q); PrintNode e0, e;
+	e0.node = root; e0.depth = 0; e0.len = n0;// 将e0.depth初始化为0，表示根节点的深度
+	enQueue(q, e0);
+	int currentDepth = 0; // 当前正在处理的深度
+
+	int count = 0;//用于统计当前层（也就是行)打印了多少个点，为后面确定后面打印几个空格做准备
+	int len0 = 0;//每行的单位（标准点)长度
+	while (!QueueEmpty(q)) {
+		deQueue(q, e);
+		int node = e.node;
+		int depth = e.depth;
+		int len = e.len;//要打印的空格数目
+
+		// 如果当前节点的深度不同于我们正在处理的深度，换行并更新当前深度
+		if (depth != currentDepth) {
+			std::cout << std::endl;
+			outFile << std::endl;
+			currentDepth = depth;
+			count = 0;//某行的开始个数清零
+			len0 = 0;//用每行最开始的len确认一个标准点，可以根据需要调节，第一行虽然不是，但没有影响
+		}
+
+		for (int i = 0; i < len - len0; ++i) {//
+			std::cout << ' ';
+			outFile << ' ';
+		}
+		// 打印当前节点
+		std::cout << ht[node].index; std::cout << ' ';
+		len0 = len + 3;//当前打印的节点的len就是下一个节点的标准点位len0
+		outFile << ht[node].index; outFile << ' ';//这里是校对用的
+		count++;//个数增加
+
+		// 将左右子节点加入队列，并设置它们的深度
+		if (ht[node].lchild != -1) {
+			e0.node = ht[node].lchild;
+			e0.depth = depth + 1; // 子节点的深度是当前节点深度+1
+			e0.len = len - 25/(e0.depth);
+			enQueue(q, e0);
+		}
+		if (ht[node].rchild != -1) {
+			e0.node = ht[node].rchild;
+			e0.depth = depth + 1; // 同上
+			e0.len =  len + 6;
+			enQueue(q, e0);
+		}
+	}
+
+	outFile.close();
+}
+
+static void readTree(HTNode ht[], int &leafnum) {
+	std::ifstream myfile("F:/visual_work/final_work/hfmTree.txt");//读取
+	int i = 0;//某个ht节点
+	if (myfile.is_open()) {
+		std::string line;
+		while (getline(myfile, line)) {
+			std::istringstream iss(line);
+			ElemType data;
+			double weight;
+			int index, parent, lchild, rchild;
+			if (!(iss >> index >> data >> weight >> parent >> lchild >> rchild)) { break; } // error
+
+			// process data
+			ht[i].index = index;
+			ht[i].data = data;
+			ht[i].weight = weight;
+			ht[i].parent = parent;
+			ht[i].lchild = lchild;
+			ht[i].rchild = rchild;
+			i++;
+			std::cout << "Index:" << index << ", Data: " << data << ", Weight: " << weight << ", Parent: " << parent << ", LChild: " << lchild << ", RChild: " << rchild << std::endl;
+		}
+		leafnum = (i + 1) / 2;//统计叶子节点个数
+		myfile.close();
+	}
+	else {
+		std::cout << "Unable to open file";
+	}
+}
