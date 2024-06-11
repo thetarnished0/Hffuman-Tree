@@ -24,7 +24,7 @@ int main() {
 			std::cin >> choice;//char in
 			getchar();
 
-			std::ofstream outFile("TreePrint.txt");
+			std::ofstream outFile("TreePrint.txt", std::ios::app);//×·¼ÓÄ£Ê½
 			switch (choice) {
 			case 'I':
 			case 'i':

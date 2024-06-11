@@ -295,8 +295,8 @@ static void printTree(HTNode ht[], int root, std::ofstream& outFile, std::string
 		}
 
 		if (ht[root].data == '`') {
-			std::cout << "* (" << ht[root].weight << ")" << std::endl;
-			outFile << "* (" << ht[root].weight << ")" << std::endl;
+			std::cout << "# (" << ht[root].weight << ")" << std::endl;
+			outFile << "# (" << ht[root].weight << ")" << std::endl;
 		}
 		else {
 			std::cout << ht[root].data << " (" << ht[root].weight << ")" << std::endl;
