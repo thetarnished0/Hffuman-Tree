@@ -24,6 +24,7 @@ int main() {
 			std::cin >> choice;//char in
 			getchar();
 
+			std::ofstream outFile("TreePrint.txt");
 			switch (choice) {
 			case 'I':
 			case 'i':
@@ -41,7 +42,12 @@ int main() {
 			case 'P':
 			case 'p':
 				dispHFMtree(leafnum);
-				printTree(ht, 2 * leafnum - 2, 2 * leafnum, leafnum);
+				if (!outFile) {
+					std::cerr << "Unable to open file";
+					continue;
+				}
+				printTree(ht, 2*leafnum - 2, outFile);
+				outFile.close();
 				break;
 			case 'Q':
 			case 'q':

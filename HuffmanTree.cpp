@@ -154,27 +154,6 @@ static int encode(HTNode ht[], HCode hcd[], ElemType s[], int n0, int &flag) {
 	return i;//count一下有多少个字符被编码了
 }
 
-/*static void InteractiveEncode(HTNode ht[], HCode hcd[], int leafnum) {
-	//交互式编码
-	printf("请输入你要编码的字符或者字符串：");
-	ElemType s1[N] = { '\0' };
-	int count = 0;//记录有多少个字符被编码了
-	scanf_s("%s", s1, (unsigned)_countof(s1));
-	getchar();//清除换行符
-	count = encode(ht, hcd, s1, leafnum);
-	printf("编码结果：");
-	std::ofstream myfile;
-	myfile.open("F:/visual_work/final_work/CodeFile.txt");//写入
-	for (int k = 0; k < count; k++) {
-		int j = hcd[k].start;
-		while (hcd[k].cd[j] != '\0') {
-			printf("%c", hcd[k].cd[j]);
-			myfile << hcd[k].cd[j];
-			j++;
-		}
-	}
-	myfile.close();
-}*/
 
 static void InteractiveEncode(HTNode ht[], HCode hcd[], int leafnum) {
 	// 交互式编码
@@ -298,107 +277,35 @@ static void PrintCode() {
 }
 
 
-typedef struct {
-	int node;//节点编号
-	int	depth;//节点深度
-	int len;//节点的左边空格数目
-}PrintNode;
-/*队列*/
-#define MaxSize 128
 
-typedef struct {
-	PrintNode data[MaxSize];
-	int front, rear;
-}SqQueue;
+static void printTree(HTNode ht[], int root, std::ofstream& outFile, std::string indent = "", bool isRight = true) {
+	if (root != -1) {
+		std::cout << indent;
+		outFile << indent;
 
-static void InitQueue(SqQueue*& q) {
-	q = (SqQueue*)malloc(sizeof(SqQueue));
-	q->front = q->rear = -1;
-}
-
-static void DestoryQueue(SqQueue*& q) {
-	free(q);
-}
-
-static bool QueueEmpty(SqQueue* q) {
-	return (q->front == q->rear);
-}
-
-static bool enQueue(SqQueue*& q, PrintNode e) {
-	if (q->rear == MaxSize - 1) {
-		return false;
-	}
-	q->rear++;
-	q->data[q->rear] = e;
-	return true;
-}
-
-static bool deQueue(SqQueue*& q, PrintNode& e) {
-	if (q->front == q->rear) {
-		return false;
-	}
-	q->front++;
-	e = q->data[q->front];//front应看作虚节点，不能访问
-	return true;
-}
-/*队列*/
-
-
-static void printTree(HTNode ht[], int root, int n0, int leafnum) {
-	std::ofstream outFile("TreePrint.txt");
-	if (!outFile) {
-		std::cerr << "Unable to open file";
-		exit(1);
-	}
-
-	SqQueue* q; InitQueue(q); PrintNode e0, e;
-	e0.node = root; e0.depth = 0; e0.len = n0;// 将e0.depth初始化为0，表示根节点的深度
-	enQueue(q, e0);
-	int currentDepth = 0; // 当前正在处理的深度
-
-	int count = 0;//用于统计当前层（也就是行)打印了多少个点，为后面确定后面打印几个空格做准备
-	int len0 = 0;//每行的单位（标准点)长度
-	while (!QueueEmpty(q)) {
-		deQueue(q, e);
-		int node = e.node;
-		int depth = e.depth;
-		int len = e.len;//要打印的空格数目
-
-		// 如果当前节点的深度不同于我们正在处理的深度，换行并更新当前深度
-		if (depth != currentDepth) {
-			std::cout << std::endl;
-			outFile << std::endl;
-			currentDepth = depth;
-			count = 0;//某行的开始个数清零
-			len0 = 0;//用每行最开始的len确认一个标准点，可以根据需要调节，第一行虽然不是，但没有影响
+		if (isRight) {
+			std::cout << "├──";
+			outFile << "├──";
+			indent += "│   ";
+		}
+		else {
+			std::cout << "└──";
+			outFile << "└──";
+			indent += "    ";
 		}
 
-		for (int i = 0; i < len - len0; ++i) {//
-			std::cout << ' ';
-			outFile << ' ';
+		if (ht[root].data == '`') {
+			std::cout << "* (" << ht[root].weight << ")" << std::endl;
+			outFile << "* (" << ht[root].weight << ")" << std::endl;
 		}
-		// 打印当前节点
-		std::cout << ht[node].index; std::cout << ' ';
-		len0 = len + 3;//当前打印的节点的len就是下一个节点的标准点位len0
-		outFile << ht[node].index; outFile << ' ';//这里是校对用的
-		count++;//个数增加
+		else {
+			std::cout << ht[root].data << " (" << ht[root].weight << ")" << std::endl;
+			outFile << ht[root].data << " (" << ht[root].weight << ")" << std::endl;
+		}
 
-		// 将左右子节点加入队列，并设置它们的深度
-		if (ht[node].lchild != -1) {
-			e0.node = ht[node].lchild;
-			e0.depth = depth + 1; // 子节点的深度是当前节点深度+1
-			e0.len = len - 25/(e0.depth);
-			enQueue(q, e0);
-		}
-		if (ht[node].rchild != -1) {
-			e0.node = ht[node].rchild;
-			e0.depth = depth + 1; // 同上
-			e0.len =  len + 6;
-			enQueue(q, e0);
-		}
+		printTree(ht, ht[root].rchild, outFile, indent, true);
+		printTree(ht, ht[root].lchild, outFile, indent, false);
 	}
-	outFile.close();
-	printf("\n");
 }
 
 static void readTree(HTNode ht[], int &leafnum) {
